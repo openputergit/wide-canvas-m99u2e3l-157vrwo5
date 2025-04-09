@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ID Card Management System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <style>
+        .loading {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+    </style>
+</head>
+<body class="bg-slate-100">
+    <div id="loading" class="loading">
+        <div class="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-blue-500"></div>
+    </div>
+
+    <nav class="bg-white shadow-lg">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center">
+                    <img src="https://via.placeholder.com/40" alt="Logo" class="h-8 w-8">
+                    <span class="ml-2 text-xl font-bold">ID Card Management</span>
+                </div>
+                <div id="nav-links" class="hidden md:flex items-center space-x-4">
+                    <!-- Dynamic nav links will be inserted here -->
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content Area -->
+    <div class="container mx-auto px-4 py-8">
+        <!-- Login Forms -->
+        <div id="login-section" class="max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-2xl font-bold mb-6 text-center">Login</h2>
+            <form id="login-form" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">User Type</label>
+                    <select id="user-type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="master">Master Admin</option>
+                        <option value="org">Organization Admin</option>
+                        <option value="local">Student</option>
+                    </select>
+                </div>
+                <div id="org-select" class="hidden">
+                    <label class="block text-sm font-medium text-gray-700">Organization</label>
+                    <select id="org-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm"></select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Username</label>
+                    <input type="text" id="username" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" id="password" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+                <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600">Login</button>
+            </form>
+            <div class="mt-4 text-center">
+                <a href="#" id="forgot-password" class="text-blue-500 hover:text-blue-700">Forgot Password?</a>
+            </div>
+            <div class="mt-4 text-center">
+                <a href="#" id="signup-link" class="text-blue-500 hover:text-blue-700">Sign Up</a>
+            </div>
+        </div>
+
+        <!-- Signup Form -->
+        <div id="signup-section" class="hidden max-w-md mx-auto bg-white rounded-lg shadow-md p-6">
+            <h2 class="text-2xl font-bold mb-6 text-center">Sign Up</h2>
+            <form id="signup-form" class="space-y-4">
+                <!-- Dynamic fields will be inserted here based on user type -->
+            </form>
+        </div>
+
+        <!-- Master Admin Dashboard -->
+        <div id="master-dashboard" class="hidden">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-bold mb-4">Create Organization Admin</h3>
+                    <form id="create-org-admin" class="space-y-4">
+                        <!-- Organization admin creation fields -->
+                    </form>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-bold mb-4">Manage Templates</h3>
+                    <form id="template-upload" class="space-y-4">
+                        <!-- Template upload fields -->
+                    </form>
+                </div>
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h3 class="text-xl font-bold mb-4">Manage Organizations</h3>
+                    <div id="org-list" class="space-y-2">
+                        <!-- Organization list will be populated here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // MongoDB Collection Names
+        const COLLECTIONS = {
+            USERS: 'users',
+            ORGANIZATIONS: 'organizations',
+            TEMPLATES: 'templates',
+            STUDENT_DATA: 'student_data'
+        };
+
+        // App Configuration
+        const APP_CONFIG = {
+            APP_SLUG: 'id-card-system-123456',
+            MASTER_ADMIN: {
+                USERNAME: 'Masteradmin',
+                PASSWORD: 'Adminidcard@123',
+                EMAIL: 'prabhuitnetworks@gmail.com'
+            },
+            DEFAULT_STUDENT_PASSWORD: 'India@123'
+        };
+
+        // Initialize MongoDB connection
+        async function initDB() {
+            try {
+                const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer l3A1Gj5O1aVL9I4J9tCkfv2rEJz1',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        appSlug: APP_CONFIG.APP_SLUG,
+                        action: 'read',
+                        collection: COLLECTIONS.ORGANIZATIONS
+                    })
+                });
+                const data = await response.json();
+                return data.success;
+            } catch (error) {
+                console.error('Database initialization failed:', error);
+                return false;
+            }
+        }
+
+        // User Authentication
+        async function authenticateUser(username, password, userType) {
+            try {
+                const response = await fetch('https://r0c8kgwocscg8gsokogwwsw4.zetaverse.one/mongodb', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer l3A1Gj5O1aVL9I4J9tCkfv2rEJz1',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        appSlug: APP_CONFIG.APP_SLUG,
+                        action: 'read',
+                        collection: COLLECTIONS.USERS,
+                        conditions: {
+                            username: username,
+                            password: password,
+                            userType: userType
+                        }
+                    })
+                });
+                const data = await response.json();
+                return data.result.length > 0 ? data.result[0] : null;
+            } catch (error) {
+                console.error('Authentication failed:', error);
+                return null;
+            }
+        }
+
+        // Event Listeners
+        document.addEventListener('DOMContentLoaded', async () => {
+            const dbInitialized = await initDB();
+            if (!dbInitialized) {
+                alert('Failed to initialize database. Please try again later.');
+                return;
+            }
+
+            // Setup form listeners
+            document.getElementById('login-form').addEventListener('submit', handleLogin);
+            document.getElementById('signup-link').addEventListener('click', showSignupForm);
+            document.getElementById('forgot-password').addEventListener('click', handleForgotPassword);
+            document.getElementById('user-type').addEventListener('change', handleUserTypeChange);
+        });
+
+        // Form Handlers
+        async function handleLogin(e) {
+            e.preventDefault();
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const userType = document.getElementById('user-type').value;
+
+            showLoading();
+            const user = await authenticateUser(username, password, userType);
+            hideLoading();
+
+            if (user) {
+                showDashboard(userType, user);
+            } else {
+                alert('Invalid credentials');
+            }
+        }
+
+        function showSignupForm() {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('signup-section').classList.remove('hidden');
+            populateSignupForm(document.getElementById('user-type').value);
+        }
+
+        function handleForgotPassword() {
+            // Implement password reset logic
+        }
+
+        function handleUserTypeChange(e) {
+            const userType = e.target.value;
+            const orgSelect = document.getElementById('org-select');
+            
+            if (userType === 'local') {
+                orgSelect.classList.remove('hidden');
+            } else {
+                orgSelect.classList.add('hidden');
+            }
+        }
+
+        // Utility Functions
+        function showLoading() {
+            document.getElementById('loading').style.display = 'block';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        function showDashboard(userType, userData) {
+            document.getElementById('login-section').classList.add('hidden');
+            document.getElementById('signup-section').classList.add('hidden');
+            
+            if (userType === 'master') {
+                document.getElementById('master-dashboard').classList.remove('hidden');
+            }
+            // Implement other dashboard views
+        }
+
+        function populateSignupForm(userType) {
+            const form = document.getElementById('signup-form');
+            form.innerHTML = ''; // Clear existing fields
+
+            // Common fields
+            const commonFields = `
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Email</label>
+                    <input type="email" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Password</label>
+                    <input type="password" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                </div>
+            `;
+
+            // Add user type specific fields
+            switch(userType) {
+                case 'org':
+                    form.innerHTML = `
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Organization Name</label>
+                            <input type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                        ${commonFields}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Mobile Number</label>
+                            <input type="tel" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Academic Year</label>
+                            <input type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Organization Logo</label>
+                            <input type="file" accept="image/*" required class="mt-1 block w-full">
+                        </div>
+                    `;
+                    break;
+                case 'local':
+                    form.innerHTML = `
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Full Name</label>
+                            <input type="text" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                        </div>
+                        ${commonFields}
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700">Gender</label>
+                            <select required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm">
+                                <option value="male">Male</option>
+                                <option value="female">Female</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <!-- Add other student-specific fields -->
+                    `;
+                    break;
+            }
+
+            // Add submit button
+            form.innerHTML += `
+                <button type="submit" class="w-full bg-blue-500 text-white py-2 rounded-md hover:bg-blue-600">
+                    Sign Up
+                </button>
+            `;
+        }
+    </script>
+<script>document.body.addEventListener('wheel', e => { if (!e.ctrlKey) return; e.preventDefault(); return }, { passive: false })</script>
+	</body>
+</html>
